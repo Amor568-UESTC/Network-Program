@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/mtServer.dir/mtServer.cpp.o CMakeFiles/mtServer.dir/wrap.cpp.o -o mtServer

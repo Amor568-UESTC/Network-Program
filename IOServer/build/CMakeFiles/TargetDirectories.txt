@@ -1,0 +1,3 @@
+/home/amor568/桌面/cpp/网络编程/IOServer/build/CMakeFiles/IOServer.dir
+/home/amor568/桌面/cpp/网络编程/IOServer/build/CMakeFiles/edit_cache.dir
+/home/amor568/桌面/cpp/网络编程/IOServer/build/CMakeFiles/rebuild_cache.dir
