@@ -1,0 +1,3 @@
+/home/amor568/桌面/cpp/网络编程/epollheap/build/CMakeFiles/epollheap.dir
+/home/amor568/桌面/cpp/网络编程/epollheap/build/CMakeFiles/edit_cache.dir
+/home/amor568/桌面/cpp/网络编程/epollheap/build/CMakeFiles/rebuild_cache.dir
