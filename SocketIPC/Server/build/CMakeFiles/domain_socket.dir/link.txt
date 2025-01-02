@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/domain_socket.dir/domain_socket.cpp.o CMakeFiles/domain_socket.dir/wrap.cpp.o -o domain_socket
