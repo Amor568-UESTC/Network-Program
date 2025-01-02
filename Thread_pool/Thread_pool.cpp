@@ -2,10 +2,11 @@
 #include<string.h>
 #include<pthread.h>
 #include<unistd.h>
+#include<signal.h>
 
 #define DEFAULT_THREAD_VARY 10
-#define DEFAULT_TIME 
-#define MIN_WAIT_TASK_NUM 
+#define DEFAULT_TIME 10
+#define MIN_WAIT_TASK_NUM 40
 
 using namespace std;
 
@@ -43,7 +44,7 @@ struct threadpool_t
 
 void* threadpool_thread(void* threadpool);
 void* adjust_thread(void* threadpool);
-int is_thread_alive(pthread_t tid);
+bool is_thread_alive(pthread_t tid);
 int threadpool_free(threadpool_t* pool);
 threadpool_t* threadpool_create(int min_thr_num,int max_thr_num,int queue_max_size);
 int threadpool_add(threadpool_t* pool,void*(*function)(void* arg),void* arg);
@@ -97,7 +98,24 @@ threadpool_t* threadpool_create(int min_thr_num,int max_thr_num,int queue_max_si
 
 int threadpool_free(threadpool_t* pool)
 {
+    if(pool==nullptr) return -1;
+
+    if(pool->task_queue)
+        delete pool->task_queue;
     
+    if(pool->threads)
+    {
+        delete pool->threads;
+        pthread_mutex_lock(&pool->lock);
+        pthread_mutex_destroy(&pool->lock);
+        pthread_mutex_lock(&pool->thread_counter);
+        pthread_mutex_destroy(&pool->thread_counter);
+        pthread_cond_destroy(&pool->queue_not_empty);
+        pthread_cond_destroy(&pool->queue_not_full);
+    }
+    delete pool;
+    pool=nullptr;
+    return 0;
 }
 
 int threadpool_add(threadpool_t* pool,void*(*function)(void* arg),void* arg)
@@ -219,19 +237,19 @@ void* adjust_thread(void* threadpool)
     while(!pool->shutdown)
     {
         sleep(DEFAULT_TIME);
-        pthread_mutex_lock(&(pool->lock));
+        pthread_mutex_lock(&pool->lock);
         int queue_size=pool->queue_size;
         int live_thr_num=pool->live_thr_num;
-        pthread_mutex_unlock(&(pool->lock));
+        pthread_mutex_unlock(&pool->lock);
 
-        pthread_mutex_lock(&(pool->thread_counter));
+        pthread_mutex_lock(&pool->thread_counter);
         int busy_thr_num=pool->busy_thr_num;
-        pthread_mutex_unlock(&(pool->thread_counter));
+        pthread_mutex_unlock(&pool->thread_counter);
 
-        //任务数大于最小线程池个数,且存活线程数少于最大线程个数时
+        //任务数大于最小线程池个数,且存活线程数少于最大线程个数时进行扩容
         if(queue_size>=MIN_WAIT_TASK_NUM&&live_thr_num<pool->max_thr_num)
         {
-            pthread_mutex_lock(&(pool->lock));
+            pthread_mutex_lock(&pool->lock);
             int add=0;
             for(int i=0;i<pool->max_thr_num
             &&add<DEFAULT_THREAD_VARY
@@ -261,13 +279,21 @@ void* adjust_thread(void* threadpool)
     return NULL;
 }
 
+bool is_thread_alive(pthread_t tid)
+{   
+    if(pthread_kill(tid,0)==ESRCH)
+        return 0;
+    else 
+        return 1;
+}
+
 //处理任务
 void* process(void* arg)
 {
     cout<<"thread "<<(unsigned int)pthread_self()
-    <<" working on task "<<(int)arg<<endl;
+    <<" working on task "<<(int*)arg<<endl;
     sleep(1);   //具体
-    cout<<"task "<<(int)arg<<" is end"<<endl;
+    cout<<"task "<<(int*)arg<<" is end"<<endl;
     return NULL;
 }
 
