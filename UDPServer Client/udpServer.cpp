@@ -6,7 +6,8 @@
 #include<ctype.h>
 
 #define SERV_PORT 8000
-
+#define SERV_IP "192.168.1.2"
+//SERV_IP为你服务的IP
 using namespace std;
 
 int main()
@@ -19,7 +20,7 @@ int main()
     int n;
     sockfd=socket(AF_INET,SOCK_DGRAM,0);
     bzero(&serv_addr,sizeof(serv_addr));
-    serv_addr.sin_addr.s_addr=htonl(INADDR_ANY);
+    inet_pton(AF_INET,"192.168.1.2",&serv_addr.sin_addr);
     serv_addr.sin_family=AF_INET;
     serv_addr.sin_port=htons(SERV_PORT);
 

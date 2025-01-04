@@ -17,7 +17,7 @@ int main()
     int n;
     sockfd=socket(AF_INET,SOCK_DGRAM,0);
     bzero(&serv_addr,sizeof(serv_addr));
-    inet_pton(AF_INET,"127.0.0.1",&serv_addr.sin_addr);
+    inet_pton(AF_INET,"192.168.1.2",&serv_addr.sin_addr);
     serv_addr.sin_family=AF_INET;
     serv_addr.sin_port=htons(SERV_PORT);
 
