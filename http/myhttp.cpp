@@ -91,7 +91,7 @@ void disconnected(int cfd,int epfd)
 }
 
 //发送http回应
-void send_response(int cfd,int no,char* disp,char* type,int len)
+void send_response(int cfd,int no,const char* disp,const char* type,int len)
 {   
     char buf[1024]={0};
     sprintf(buf,"HTTP/1.1 %d %s\r\n",no,disp);
@@ -107,15 +107,37 @@ void send_file(int cfd,const char* file)
     int fd=open(file,O_RDONLY);
     if(fd==-1)
     {
-        //回发浏览器错误页面404
+        send_file(cfd,"404.html");
         perror("open file error");
-        exit(1);
     }
     int n=0;
     char buf[1024]={0};
-    while((n=read(fd,buf,sizeof(buf)))>0)
+    while(n=read(fd,buf,sizeof(buf)))
         send(cfd,buf,n,0);
     close(fd);
+}
+
+const char* get_file_type(const char* name)
+{
+    const char* dot=strrchr(name,'.');  //自右向左查找.;
+    if(dot==NULL) return "Content-Type: text/plain; charset=utf-8";
+    if(!strcmp(dot,".html")||!strcmp(dot,".htm")) return "Content-Type: text/html; charset=utf-8";
+    if(!strcmp(dot,".jpg")||!strcmp(dot,".jpeg")) return "Content-Type: image/jpeg";
+    if(!strcmp(dot,".gif")) return "Content-Type: image/gif";
+    if(!strcmp(dot,".png")) return "Content-Type: image/png";
+    if(!strcmp(dot,".css")) return "Content-Type: text/css";
+    if(!strcmp(dot,".au")) return "Content-Type: audio/basic";
+    if(!strcmp(dot,".wav")) return "Content-Type: audio/wav";
+    if(!strcmp(dot,".avi")) return "Content-Type: video/quicktime";
+    if(!strcmp(dot,".mov")||!strcmp(dot,".qt")) return "Content-Type: video/x-msvideo";
+    if(!strcmp(dot,".mpeg")||!strcmp(dot,".mpe")) return "Content-Type: video/mpeg";
+    if(!strcmp(dot,".vrml")||!strcmp(dot,".wrl")) return "Content-Type: model/vrml";
+    if(!strcmp(dot,".midi")||!strcmp(dot,".mid")) return "Content-Type: audio/midi";
+    if(!strcmp(dot,".mp3")) return "Content-Type: audio/mp3";
+    if(!strcmp(dot,".ogg")) return "Content-Type: application/ogg";
+    if(!strcmp(dot,".pdf")) return "Content-Type: application/pdf";
+    if(!strcmp(dot,".pac")) return "Content-Type: application/x-ns-proxy-autoconfig";
+    return "Content-Type: text/plain; charset=utf-8";
 }
 
 //处理http请求，判断文件是否存在，回发
@@ -125,14 +147,14 @@ void http_request(int cfd,const char* file)
     int ret=stat(file,&sbuf);
     if(ret!=0)
     {
-        //回发浏览器错误页面404
+        send_response(cfd,200,"OK",get_file_type("404.html"),-1);
+        send_file(cfd,"404.html");
         perror("stat error");
-        exit(1);
     }
     if(S_ISREG(sbuf.st_mode))   //普通文件
     {
         cout<<"----------is file"<<endl;
-        send_response(cfd,200,"OK","Content-Type: text/plain; charset=iso-8859-1",sbuf.st_size);
+        send_response(cfd,200,"OK",get_file_type(file),-1);
         send_file(cfd,file);
     }
 }
@@ -151,7 +173,7 @@ void do_read(int cfd,int epfd)
     {
         char method[16],path[256],protocol[16];
         sscanf(line,"%[^ ] %[^ ] %[^ ]",method,path,protocol);  //正则表达式获取文件名
-        cout<<"method = "<<method<<",path = "<<path<<",protocol = "<<protocol<<endl;
+        cout<<"method = "<<method<<",path = "<<path<<",protocol = "<<protocol;
         while(1)
         {
             char buf[1024];
@@ -202,6 +224,8 @@ void epoll_run(int port)
 int main(int argc,char *argv[])
 {
     if(argc<3) cout<<"./a.out port path"<<endl;
+    argv[1]="9876";
+    argv[2]="/home/amor568/桌面/cpp/网络编程/http/dir";
     int port=atoi(argv[1]);
     int ret=chdir(argv[2]); //改变进程的工作目录
     if(ret!=0)
