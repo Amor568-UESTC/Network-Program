@@ -5,10 +5,51 @@
 #include<sys/stat.h>
 #include<string.h>
 #include<unistd.h>
+#include<dirent.h>
 
 #define MAXSIZE 2048
 
 using namespace std;
+
+int hexit(char c)
+{
+    if(c>='0'&&c<='9')
+        return c-'0';
+    if(c>='a'&&c<='f')
+        return c-'a'+10;
+    if(c>='A'&&c<='F')
+        return c-'A'+10;
+}
+
+void encode_str(char* to,int tosize,const char* from)
+{
+    for(int i=0;*from!=0&&i+4<tosize;from++)
+        if(isalnum(*from)||strchr("/_.-~",*from))
+        {
+            *to=*from;
+            to++;
+            i++;
+        }
+        else 
+        {
+            sprintf(to,"%%%02x",(int)*from&0xff);
+            to+=3;
+            i+=3;
+        }
+    *to=0;
+}
+
+void decode_str(char* to,char* from)
+{
+    for(;*from!=0;to++,from++)
+        if(from[0]=='%'&&isdigit(from[1])&&isdigit(from[2]))
+        {
+            *to=hexit(from[1])*16+hexit(from[2]);
+            from+=2;
+        }
+        else *to=*from;
+    *to=0;
+}
 
 //获取一行\r\n结尾的数据，符合http报文格式
 int get_line(int cfd,char* buf,int size)
@@ -20,7 +61,7 @@ int get_line(int cfd,char* buf,int size)
         n=recv(cfd,&c,1,0);
         if(n>0)
         {
-            if(c=='/r')
+            if(c=='\r')
             {
                 n=recv(cfd,&c,1,MSG_PEEK);  //模拟读一次
                 if(n>0&&c=='\n')
@@ -101,6 +142,39 @@ void send_response(int cfd,int no,const char* disp,const char* type,int len)
     send(cfd,buf,strlen(buf),0);
 }
 
+void send_dir(int cfd,const char* dir)
+{
+    char buf[1024]={0};
+    sprintf(buf,"<html><head><title>目录名: %s</title></head>",dir);
+    sprintf(buf+strlen(buf),"<body><h1>当前目录: %s</h1><table>",dir);
+    char enstr[1024],path[1024];
+    dirent** ptr;
+    int num=scandir(dir,&ptr,NULL,alphasort);
+    for(int i=0;i<num;i++)
+    {
+        char* name=ptr[i]->d_name;
+        sprintf(path,"%s/%s",dir,name);
+        struct stat st;
+        stat(path,&st);
+        encode_str(enstr,sizeof(enstr),name);
+        if(S_ISREG(st.st_mode))
+            sprintf(buf+strlen(buf),"<tr><td><a href=\"%s\">%s</a></td><td>%ld</td></tr>",enstr,name,(long)st.st_size);
+        else if(S_ISDIR(st.st_mode))
+            sprintf(buf+strlen(buf),"<tr><td><a href=\"%s/\">%s</a></td><td>%ld</td></tr>",enstr,name,(long)st.st_size);
+        send(cfd,buf,strlen(buf),0);
+        memset(buf,0,sizeof(buf));
+    }
+    sprintf(buf+strlen(buf),"</table></body></html>");
+    send(cfd,buf,strlen(buf),0);
+#if 0
+    DIR* dir1=opendir(dir);
+    dirent* ptr=NULL;
+    while((ptr=readdir(dir1))!=NULL)
+        char* name=ptr->d_name;
+    closedir(dir1);
+#endif
+}
+
 //发送服务器本地文件
 void send_file(int cfd,const char* file)
 {
@@ -113,7 +187,11 @@ void send_file(int cfd,const char* file)
     int n=0;
     char buf[1024]={0};
     while(n=read(fd,buf,sizeof(buf)))
+    {
         send(cfd,buf,n,0);
+        //cout<<"n= "<<n<<endl;
+    }
+    //cout<<"send file successfully!"<<endl;
     close(fd);
 }
 
@@ -151,6 +229,12 @@ void http_request(int cfd,const char* file)
         send_file(cfd,"404.html");
         perror("stat error");
     }
+    if(S_ISDIR(sbuf.st_mode))
+    {
+        cout<<"----------is dir"<<endl;
+        send_response(cfd,200,"OK",get_file_type(".html"),-1);
+        send_dir(cfd,file);
+    }
     if(S_ISREG(sbuf.st_mode))   //普通文件
     {
         cout<<"----------is file"<<endl;
@@ -181,10 +265,13 @@ void do_read(int cfd,int epfd)
             if(len==0) break;
             else if(len==-1) break;
         }
+        decode_str(path,path);
         if(strncasecmp(method,"GET",3)==0)
         {
             char* file=path+1;  //取出客户端要访问的文件名
+            if(!strcmp(path,"/")) file="./";
             http_request(cfd,file);
+            disconnected(cfd,epfd);
         }
     }
         
